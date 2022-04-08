@@ -126,13 +126,19 @@ Install Cilium
             --set azure.enabled=true \\
             --set azure.resourceGroup=$AZURE_NODE_RESOURCE_GROUP \\
             --set azure.subscriptionID=$AZURE_SUBSCRIPTION_ID \\
-            --set azure.tenantID=$AZURE_TENANT_ID \\
-            --set azure.clientID=$AZURE_CLIENT_ID \\
-            --set azure.clientSecret=$AZURE_CLIENT_SECRET \\
-            --set tunnel=disabled \\
-            --set ipam.mode=azure \\
+            --set tunnel=vxlan \\
+            --set ipam.mode=cluster-pool \\
+            --set ipam.operator.clusterPoolIPv4PodCIDRList=10.240.0.0/16 \\
+            --set ipam.operator.clusterPoolIPv4MaskSize=24 \\
             --set enableIPv4Masquerade=false \\
             --set nodeinit.enabled=true
+
+       .. note::
+
+          In BYOCNI mode, the older Azure-specific Cilium operator image that
+          was required for :ref:`Azure IPAM<ipam_azure>` does not work anymore.
+          For now, the generic Cilium operator image must be used and configured
+          to use :ref:`cluster-pool IPAM<ipam_crd_cluster_pool>`.
 
     .. group-tab:: EKS
 
