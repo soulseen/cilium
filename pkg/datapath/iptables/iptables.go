@@ -5,6 +5,7 @@ package iptables
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 	"github.com/mattn/go-shellwords"
 	"github.com/sirupsen/logrus"
 
+	"github.com/cilium/cilium/pkg/backoff"
 	"github.com/cilium/cilium/pkg/byteorder"
 	"github.com/cilium/cilium/pkg/command/exec"
 	"github.com/cilium/cilium/pkg/datapath"
@@ -854,6 +856,28 @@ func (m *IptablesManager) InstallProxyRules(proxyPort uint16, ingress bool, name
 	m.Lock()
 	defer m.Unlock()
 
+	backoff := backoff.Exponential{
+		Min:    time.Duration(200) * time.Millisecond,
+		Max:    2 * time.Minute,
+		Factor: 2.0,
+		Name:   "iptables-proxy-rules-installer",
+	}
+
+	for retry := 0; retry < 3; retry++ {
+		if err := m.doInstallProxyRules(proxyPort, ingress, name); err != nil {
+			log.WithError(err).Warning("Failed to install iptables proxy rules")
+			backoff.Wait(context.TODO())
+			continue
+		}
+
+		log.Info("Iptables proxy rules installed")
+		return nil
+	}
+
+	return nil
+}
+
+func (m *IptablesManager) doInstallProxyRules(proxyPort uint16, ingress bool, name string) error {
 	if m.haveBPFSocketAssign {
 		log.WithField("port", proxyPort).
 			Debug("Skipping proxy rule install due to BPF support")
@@ -1244,6 +1268,28 @@ func (m *IptablesManager) InstallRules(ifName string, firstInitialization, insta
 	m.Lock()
 	defer m.Unlock()
 
+	backoff := backoff.Exponential{
+		Min:    time.Duration(200) * time.Millisecond,
+		Max:    2 * time.Minute,
+		Factor: 2.0,
+		Name:   "iptables-rules-installer",
+	}
+
+	for retry := 0; retry < 3; retry++ {
+		if err := m.doInstallRules(ifName, firstInitialization, install); err != nil {
+			log.WithError(err).Warning("Failed to install iptables rules")
+			backoff.Wait(context.TODO())
+			continue
+		}
+
+		log.Info("Iptables rules installed")
+		return nil
+	}
+
+	return nil
+}
+
+func (m *IptablesManager) doInstallRules(ifName string, firstInitialization, install bool) error {
 	// Make sure we have no old "backups"
 	if err := m.removeRules(oldCiliumPrefix); err != nil {
 		return err
