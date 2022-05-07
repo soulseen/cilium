@@ -618,24 +618,25 @@ func (m *IptablesManager) doCopyProxyRules(prog iptablesInterface, table string,
 	scanner := bufio.NewScanner(strings.NewReader(rules))
 	for scanner.Scan() {
 		rule := scanner.Text()
-		if re.MatchString(rule) && strings.Contains(rule, match) {
+		if !re.MatchString(rule) || !strings.Contains(rule, match) {
+			continue
+		}
 
-			log.WithField(logfields.Object, logfields.Repr(rule)).Debugf("Considering copying %s TPROXY rule from %s to %s", prog, oldChain, newChain)
-			args, err := shellwords.Parse(strings.Replace(rule, oldChain, newChain, 1))
-			if err != nil {
-				log.WithFields(logrus.Fields{
-					"table":          table,
-					"prog":           prog.getProg(),
-					logfields.Object: rule,
-				}).WithError(err).Warn("Unable to parse TPROXY rule, disruption to traffic selected by L7 policy possible")
-				continue
-			}
+		log.WithField(logfields.Object, logfields.Repr(rule)).Debugf("Considering copying %s TPROXY rule from %s to %s", prog, oldChain, newChain)
+		args, err := shellwords.Parse(strings.Replace(rule, oldChain, newChain, 1))
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"table":          table,
+				"prog":           prog.getProg(),
+				logfields.Object: rule,
+			}).WithError(err).Warn("Unable to parse TPROXY rule, disruption to traffic selected by L7 policy possible")
+			continue
+		}
 
-			copyRule := append([]string{"-t", table}, args...)
-			log.WithField(logfields.Object, logfields.Repr(copyRule)).Debugf("Copying %s TPROXY rule from %s to %s", prog, oldChain, newChain)
-			if err = prog.runProg(copyRule); err != nil {
-				return err
-			}
+		copyRule := append([]string{"-t", table}, args...)
+		log.WithField(logfields.Object, logfields.Repr(copyRule)).Debugf("Copying %s TPROXY rule from %s to %s", prog, oldChain, newChain)
+		if err = prog.runProg(copyRule); err != nil {
+			return err
 		}
 	}
 
