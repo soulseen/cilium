@@ -199,6 +199,8 @@ func (m *IptablesManager) removeCiliumRules(table string, prog iptablesInterface
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(rules))
+
+nextRule:
 	for scanner.Scan() {
 		rule := scanner.Text()
 		log.WithField(logfields.Object, logfields.Repr(rule)).Debugf("Considering removing %s rule", prog)
@@ -207,35 +209,32 @@ func (m *IptablesManager) removeCiliumRules(table string, prog iptablesInterface
 		// the name CILIUM_ or call a chain with the name CILIUM_:
 		// -A CILIUM_FORWARD -o cilium_host -m comment --comment "cilium: any->cluster on cilium_host forward accept" -j ACCEPT
 		// -A POSTROUTING -m comment --comment "cilium-feeder: CILIUM_POST" -j CILIUM_POST
-		if strings.Contains(rule, match) {
-			// do not remove feeder for chains that are set to be disabled
-			// ie catch the beginning of the rule like -A POSTROUTING to match it against
-			// disabled chains
-			skipFeeder := false
-			for _, disabledChain := range option.Config.DisableIptablesFeederRules {
-				if strings.Contains(rule, " "+strings.ToUpper(disabledChain)+" ") {
-					log.WithField("chain", disabledChain).Info("Skipping the removal of feeder chain")
-					skipFeeder = true
-					break
-				}
-			}
-			if skipFeeder {
-				continue
-			}
+		if !strings.Contains(rule, match) {
+			continue
+		}
 
-			reversedRule, err := reverseRule(rule)
-			if err != nil {
-				log.WithError(err).WithField(logfields.Object, rule).Warnf("Unable to parse %s rule into slice. Leaving rule behind.", prog)
-				continue
+		// do not remove feeder for chains that are set to be disabled
+		// ie catch the beginning of the rule like -A POSTROUTING to match it against
+		// disabled chains
+		for _, disabledChain := range option.Config.DisableIptablesFeederRules {
+			if strings.Contains(rule, " "+strings.ToUpper(disabledChain)+" ") {
+				log.WithField("chain", disabledChain).Info("Skipping the removal of feeder chain")
+				continue nextRule
 			}
+		}
 
-			if len(reversedRule) > 0 {
-				deleteRule := append([]string{"-t", table}, reversedRule...)
-				log.WithField(logfields.Object, logfields.Repr(deleteRule)).Debugf("Removing %s rule", prog)
+		reversedRule, err := reverseRule(rule)
+		if err != nil {
+			log.WithError(err).WithField(logfields.Object, rule).Warnf("Unable to parse %s rule into slice. Leaving rule behind.", prog)
+			continue
+		}
 
-				if err := prog.runProg(deleteRule); err != nil {
-					return err
-				}
+		if len(reversedRule) > 0 {
+			deleteRule := append([]string{"-t", table}, reversedRule...)
+			log.WithField(logfields.Object, logfields.Repr(deleteRule)).Debugf("Removing %s rule", prog)
+
+			if err := prog.runProg(deleteRule); err != nil {
+				return err
 			}
 		}
 	}
