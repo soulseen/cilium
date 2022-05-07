@@ -670,39 +670,38 @@ func (m *IptablesManager) addProxyRules(prog iptablesInterface, proxyPort uint16
 		return err
 	}
 
-	if ingress {
-		if err := m.iptIngressProxyRule(rules, prog, "tcp", proxyPort, name); err != nil {
-			return err
-		}
-		if err := m.iptIngressProxyRule(rules, prog, "udp", proxyPort, name); err != nil {
-			return err
-		}
-	} else {
-		if err := m.iptEgressProxyRule(rules, prog, "tcp", proxyPort, name); err != nil {
-			return err
-		}
-		if err := m.iptEgressProxyRule(rules, prog, "udp", proxyPort, name); err != nil {
-			return err
+	for _, proto := range []string{"tcp", "udp"} {
+		if ingress {
+			if err := m.iptIngressProxyRule(rules, prog, proto, proxyPort, name); err != nil {
+				return err
+			}
+		} else {
+			if err := m.iptEgressProxyRule(rules, prog, proto, proxyPort, name); err != nil {
+				return err
+			}
 		}
 	}
+
 	// Delete all other rules for this same proxy name
 	// These may accumulate if there is a bind failure on a previously used port
 	portMatch := fmt.Sprintf("TPROXY --on-port %d ", proxyPort)
 	scanner := bufio.NewScanner(strings.NewReader(rules))
 	for scanner.Scan() {
 		rule := scanner.Text()
-		if strings.Contains(rule, "-A CILIUM_PRE_mangle ") && !strings.Contains(rule, "cilium: TPROXY to host "+name) && strings.Contains(rule, portMatch) {
+		if !strings.Contains(rule, "-A CILIUM_PRE_mangle ") || strings.Contains(rule, "cilium: TPROXY to host "+name) || !strings.Contains(rule, portMatch) {
+			continue
+		}
 
-			args, err := shellwords.Parse(strings.Replace(rule, "-A", "-D", 1))
-			if err != nil {
-				log.WithError(err).WithField(logfields.Object, rule).Warnf("Unable to parse %s TPROXY rule", prog)
-				continue
-			}
+		args, err := shellwords.Parse(strings.Replace(rule, "-A", "-D", 1))
+		if err != nil {
+			log.WithError(err).WithField(logfields.Object, rule).Warnf("Unable to parse %s TPROXY rule", prog)
+			continue
+		}
 
-			deleteRule := append([]string{"-t", "mangle"}, args...)
-			if err = prog.runProg(deleteRule); err != nil {
-				return err
-			}
+		deleteRule := append([]string{"-t", "mangle"}, args...)
+		err = prog.runProg(deleteRule)
+		if err != nil {
+			return err
 		}
 	}
 
