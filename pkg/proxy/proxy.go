@@ -368,18 +368,19 @@ func (p *Proxy) SetProxyPort(name string, port uint16) error {
 
 // ReinstallRules is called by daemon reconfiguration to re-install proxy ports rules that
 // were removed during the removal of all Cilium rules.
-func (p *Proxy) ReinstallRules() {
+func (p *Proxy) ReinstallRules() error {
 	proxyPortsMutex.Lock()
 	defer proxyPortsMutex.Unlock()
 	for _, pp := range proxyPorts {
 		if pp.rulesPort > 0 {
 			// This should always succeed if we have managed to start-up properly
-			err := p.datapathUpdater.InstallProxyRules(pp.rulesPort, pp.ingress, pp.name)
-			if err != nil {
-				log.WithError(err).Errorf("Can't install proxy rules for %s", pp.name)
+			if err := p.datapathUpdater.InstallProxyRules(pp.rulesPort, pp.ingress, pp.name); err != nil {
+				return fmt.Errorf("cannot install proxy rules for %s: %w", pp.name, err)
 			}
 		}
 	}
+
+	return nil
 }
 
 // CreateOrUpdateRedirect creates or updates a L4 redirect with corresponding
