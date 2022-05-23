@@ -6,6 +6,7 @@ package service
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"sync/atomic"
 	"time"
 
@@ -83,7 +84,7 @@ type svcInfo struct {
 	hash          string
 	frontend      lb.L3n4AddrID
 	backends      []lb.Backend
-	backendByHash map[string]*lb.Backend
+	backendByHash map[netip.Addr]*lb.Backend
 
 	svcType                   lb.SVCType
 	svcTrafficPolicy          lb.SVCTrafficPolicy
@@ -182,8 +183,8 @@ type Service struct {
 	svcByHash map[string]*svcInfo
 	svcByID   map[lb.ID]*svcInfo
 
-	backendRefCount counter.StringCounter
-	backendByHash   map[string]*lb.Backend
+	backendRefCount counter.Counter[netip.Addr]
+	backendByHash   map[netip.Addr]*lb.Backend
 
 	healthServer  healthServer
 	monitorNotify monitorNotify
@@ -207,10 +208,10 @@ func NewService(monitorNotify monitorNotify, envoyCache envoyCache) *Service {
 	maglevTableSize := option.Config.MaglevTableSize
 
 	svc := &Service{
-		svcByHash:       map[string]*svcInfo{},
+		svcByHash:       map[netip.Addr]*svcInfo{},
 		svcByID:         map[lb.ID]*svcInfo{},
-		backendRefCount: counter.StringCounter{},
-		backendByHash:   map[string]*lb.Backend{},
+		backendRefCount: counter.Counter[netip.Addr]{},
+		backendByHash:   map[netip.Addr]*lb.Backend{},
 		monitorNotify:   monitorNotify,
 		envoyCache:      envoyCache,
 		healthServer:    localHealthServer,
@@ -666,8 +667,6 @@ func (s *Service) UpdateBackendsState(backends []lb.Backend) error {
 	s.Lock()
 	defer s.Unlock()
 	for _, updatedB := range backends {
-		hash := updatedB.L3n4Addr.Hash()
-
 		be, exists := s.backendByHash[hash]
 		if !exists {
 			// Cilium service API and Kubernetes events are asynchronous, so it's
@@ -723,7 +722,7 @@ func (s *Service) UpdateBackendsState(backends []lb.Backend) error {
 				}).Info("Persisting service with backend state update")
 			}
 			s.svcByID[id] = info
-			s.svcByHash[info.frontend.Hash()] = info
+			s.svcByHash[info.frontend.IP] = info
 		}
 		updatedBackends = append(updatedBackends, be)
 	}
@@ -766,7 +765,7 @@ func (s *Service) DeleteService(frontend lb.L3n4Addr) (bool, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	if svc, found := s.svcByHash[frontend.Hash()]; found {
+	if svc, found := s.svcByHash[frontend.IP]; found {
 		return true, s.deleteServiceLocked(svc)
 	}
 
@@ -959,7 +958,7 @@ func (s *Service) createSVCInfoIfNotExist(p *lb.SVC) (*svcInfo, bool, bool,
 	prevSessionAffinity := false
 	prevLoadBalancerSourceRanges := []*cidr.CIDR{}
 
-	hash := p.Frontend.Hash()
+	hash := p.Frontend.IP
 	svc, found := s.svcByHash[hash]
 	if !found {
 		// Allocate service ID for the new service
@@ -1403,10 +1402,10 @@ func (s *Service) updateBackendsCacheLocked(svc *svcInfo, backends []lb.Backend)
 	obsoleteBackendIDs := []lb.BackendID{}    // not used by any svc
 	obsoleteSVCBackendIDs := []lb.BackendID{} // removed from the svc, but might be used by other svc
 	newBackends := []lb.Backend{}             // previously not used by any svc
-	backendSet := map[string]struct{}{}
+	backendSet := map[netip.Addr]struct{}{}
 
 	for i, backend := range backends {
-		hash := backend.L3n4Addr.Hash()
+		hash := backend.L3n4Addr.IP
 		backendSet[hash] = struct{}{}
 
 		if b, found := svc.backendByHash[hash]; !found {
