@@ -414,6 +414,7 @@ func findRoutesAndLinks() (map[int]netlink.Route, map[int]netlink.Link, error) {
 		for _, r := range routes {
 			link, err := netlink.LinkByIndex(r.LinkIndex)
 			if err != nil {
+				fmt.Printf("zxy0 LinkByIndex error")
 				if strings.Contains(err.Error(), "Link not found") {
 					continue
 				}
@@ -422,6 +423,7 @@ func findRoutesAndLinks() (map[int]netlink.Route, map[int]netlink.Link, error) {
 
 			linkName := link.Attrs().Name
 			if !linkMatch(linkName) {
+				fmt.Printf("zxy1 link not match %s\n", linkName)
 				continue
 			}
 			routesToRemove[r.LinkIndex] = r
@@ -433,6 +435,7 @@ func findRoutesAndLinks() (map[int]netlink.Route, map[int]netlink.Link, error) {
 		for _, link := range links {
 			linkName := link.Attrs().Name
 			if !linkMatch(linkName) {
+				fmt.Printf("zxy2 link not match  %s\n", linkName)
 				continue
 			}
 			linksToRemove[link.Attrs().Index] = link
