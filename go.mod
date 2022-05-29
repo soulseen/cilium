@@ -2,13 +2,7 @@ module github.com/test
 
 go 1.17
 
-require (
-	github.com/cilium/cilium v1.11.5
-	github.com/spf13/cobra v1.4.0
-	github.com/spf13/viper v1.12.0
-	github.com/vishvananda/netlink v1.1.1-0.20220125195016-0639e7e787ba
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
-)
+require github.com/vishvananda/netlink v1.1.1-0.20220125195016-0639e7e787ba
 
 require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
@@ -18,6 +12,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/cilium/cilium v1.11.5 // indirect
 	github.com/cilium/ebpf v0.7.0 // indirect
 	github.com/containernetworking/plugins v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
@@ -58,13 +53,16 @@ require (
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/afero v1.8.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
+	github.com/spf13/cobra v1.4.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/viper v1.12.0 // indirect
 	github.com/subosito/gotenv v1.3.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74 // indirect
 	go.mongodb.org/mongo-driver v1.7.4 // indirect
 	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
